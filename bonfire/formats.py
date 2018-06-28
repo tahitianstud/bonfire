@@ -8,9 +8,9 @@ from __future__ import division, print_function
 from termcolor import colored
 import syslog
 import six
+import click
 
-
-def tail_format(fields=["source", "facility", "line", "module"], color=True):
+def tail_format(fields=["source", "facility", "line", "module"], color=True, display_mode=""):
     def format(entry):
         message_text = entry.message
         timestamp = entry.timestamp.to('local')
@@ -43,10 +43,16 @@ def tail_format(fields=["source", "facility", "line", "module"], color=True):
             message_text = " " + message_text + " #"
 
         local_fields = list(fields)
+
         if "message" in local_fields:
             local_fields.remove("message")
 
-        field_text = map(lambda f: "{}:{}".format(f, entry.message_dict.get(f, "")), local_fields)
+        if display_mode == "fields-only":
+          column_width=10
+          field_text = map(lambda f: "{value:{width}}".format(
+              value=entry.message_dict.get(f, "N/A"), width=column_width), local_fields)
+        else:
+          field_text = map(lambda f: "{}:{}".format(f, entry.message_dict.get(f, "")), local_fields)
 
         if six.PY2:
             try:
@@ -56,11 +62,20 @@ def tail_format(fields=["source", "facility", "line", "module"], color=True):
 
         message_text = six.u(message_text)
 
-        log = six.u("{level_string}[{timestamp}]{message_text} {field_text}").format(
-            timestamp=timestamp.format("YYYY-MM-DD HH:mm:ss.SS"),
-            level_string=level_string,
-            message_text=message_text,
-            field_text="; ".join(field_text))
+        if display_mode == "fields-only":
+          
+          fields_display_str = "| ".join(field_text)
+
+          if (len(fields_display_str) > 2):
+            log = six.u("{} | {}").format(fields_display_str, message_text)
+          else:
+            log = six.u("{message_text}").format(message_text=message_text)
+        else:
+          log = six.u("{level_string}[{timestamp}]{message_text} {field_text}").format(
+              timestamp=timestamp.format("YYYY-MM-DD HH:mm:ss.SS"),
+              level_string=level_string,
+              message_text=message_text,
+              field_text="; ".join(field_text))
         if color:
             return colored(log, log_color, log_background)
         else:

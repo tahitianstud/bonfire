@@ -49,6 +49,8 @@ from .formats import tail_format, dump_format
 @click.option('--sort', '-s', default=None, help="Field used for sorting (default: timestamp)")
 @click.option("--asc/--desc", default=False, help="Sort ascending / descending")
 @click.option("--proxy", default=None, help="Proxy to use for the http/s request")
+@click.option("--fields-only", "display_mode", flag_value="fields-only", help="Display logs showing only the fields (default or specified)")
+@click.option("--saved-search", default=None, help="Uses a saved search stored in Graylog Server")
 @click.argument('query', default="*")
 def run(host,
         node,
@@ -72,7 +74,10 @@ def run(host,
         sort,
         asc,
         proxy,
-        query):
+        query,
+        saved_search,
+        display_mode="",
+        ):
     """
     Bonfire - A graylog CLI client
     """
@@ -151,6 +156,25 @@ def run(host,
         if cfg.has_option(section_name, "stream"):
             stream = get_templated_option(cfg, section_name, "stream", template_options)
 
+    # fetch and use saved search
+    if saved_search != None:
+      gl_saved_searches_output = gl_api.get("search/saved")
+      for search in gl_saved_searches_output['searches']:
+        if search['title'].lower() == saved_search.lower():
+          click.echo("Using saved search: '{}' as a template".format(search['title']))
+
+          search_from = search['query']['relative']
+          click.echo("* search from: '{}'".format(search_from))
+          
+          field = search['query']['fields'].split(",")
+          click.echo("* show fields: '{}'".format(field))
+          
+          if query == "*" and search['query']['query'] != "*":
+            query = search['query']['query']
+            click.echo("* query: '{}'".format(query))
+
+          break
+
     # Configure the base query
     sr = SearchRange(from_time=search_from, to_time=search_to)
 
@@ -191,9 +215,10 @@ def run(host,
     # Check the mode in which the program should run (dump, tail or interactive mode)
     if mode == "tail":
         if fields:
-            formatter = tail_format(fields)
+            formatter = tail_format(fields, display_mode=display_mode)
         else:
-            formatter = tail_format()
+            formatter = tail_format(
+                display_mode=display_mode)
     elif mode == "dump":
         formatter = dump_format()
 
@@ -201,4 +226,5 @@ def run(host,
 
 
 if __name__ == "__main__":
+    # pylint: disable=no-value-for-parameter
     run()

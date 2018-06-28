@@ -118,6 +118,7 @@ class GraylogAPI(object):
         r = requests.get(self.base_url + url, params=params, headers=self.get_header,
                          auth=(self.username, self.password), proxies=self.proxies)
 
+        # pylint: disable=no-member
         if r.status_code == requests.codes.ok:
             return r.json()
         else:
